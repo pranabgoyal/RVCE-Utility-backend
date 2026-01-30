@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Resource = require('../models/Resource');
+const multer = require('multer');
+const { uploadToSupabase } = require('../utils/supabase');
 
-// get resources (with filters)
 // get resources (with filters)
 router.get('/', async (req, res) => {
     try {
@@ -22,13 +23,11 @@ router.get('/', async (req, res) => {
     }
 });
 
-const multer = require('multer');
-const { storage } = require('../config/cloudinary');
-
+// Configure Multer for Memory Storage (Buffers)
+const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
-        // Accept images and pdfs
         if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
@@ -38,15 +37,22 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-// Create Resource with File Upload
+// Create Resource with File Upload (to Supabase)
 router.post('/', upload.single('file'), async (req, res) => {
     try {
         const { title, description, category, branch, year } = req.body;
 
         let fileUrl = '';
         if (req.file) {
-            // Cloudinary returns the URL in `path` or `secure_url`
-            fileUrl = req.file.path || req.file.secure_url;
+            // Upload buffer to Supabase
+            // Use 'uploads' or specific folder based on category/branch if desired
+            // For now, mirroring the seeder logic or just putting in a general folder
+            const folderName = req.body.subject || 'general';
+            fileUrl = await uploadToSupabase(req.file.buffer, folderName, req.file.originalname);
+
+            if (!fileUrl) {
+                return res.status(500).send('Failed to upload file to storage');
+            }
         }
 
         const newResource = new Resource({
@@ -56,7 +62,7 @@ router.post('/', upload.single('file'), async (req, res) => {
             branch,
             year,
             fileUrl,
-            // createdBy: req.user.id // Middleware needed to extract user to be added later
+            // createdBy: req.user.id // Middleware needed later
         });
 
         const resource = await newResource.save();

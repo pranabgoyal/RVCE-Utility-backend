@@ -1,22 +1,16 @@
-const mongoose = require('mongoose');
-const cloudinary = require('cloudinary').v2;
-const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const Resource = require('../models/Resource');
 
-// Load env vars
+// Load env vars BEFORE requiring other modules that use them
 dotenv.config({ path: path.join(__dirname, '../.env') });
+
+const mongoose = require('mongoose');
+const { uploadToSupabase } = require('./supabase');
+const fs = require('fs');
+const Resource = require('../models/Resource');
 
 const UPLOADS_DIR = path.join(__dirname, '../../frontend/public/uploads/1st_year');
 
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-// Helper to determine category based on keywords
 const getCategory = (filename) => {
     const lower = filename.toLowerCase();
     if (lower.includes('paper') || lower.includes('qp') || lower.includes('cie') || lower.includes('see')) return 'Paper';
@@ -25,22 +19,6 @@ const getCategory = (filename) => {
     if (lower.includes('assignment')) return 'Assignment';
     if (lower.includes('project')) return 'Project';
     return 'Notes';
-};
-
-const uploadToCloudinary = async (filePath, folderName) => {
-    try {
-        const result = await cloudinary.uploader.upload(filePath, {
-            folder: `engineering-resources/${folderName}`,
-            resource_type: 'raw', // CHANGED: 'raw' is safer for PDFs/Docs (avoids explicit image conversion)
-            use_filename: true,
-            unique_filename: false,
-            overwrite: true // CHANGED: Force overwrite of bad files on Cloud
-        });
-        return result.secure_url;
-    } catch (error) {
-        console.error('Cloudinary Upload Error:', error);
-        return null;
-    }
 };
 
 const seedCloudResources = async () => {
@@ -77,23 +55,8 @@ const seedCloudResources = async () => {
                     const filePath = path.join(subPath, file);
                     const title = path.basename(file, path.extname(file)).replace(/_/g, ' ');
 
-                    // RE-SEEDING LOGIC:
-                    // We REMOVED the "skip if existing" check to force repair of broken links.
-                    /*
-                    const existing = await Resource.findOne({
-                        title: title,
-                        subject: subFolder,
-                        fileUrl: { $regex: 'cloudinary' }
-                    });
-
-                    if (existing) {
-                        console.log(`Skipping (Already in DB): ${file}`);
-                        continue;
-                    }
-                    */
-
-                    console.log(`Uploading (Raw Mode): ${file}`);
-                    const cloudUrl = await uploadToCloudinary(filePath, subFolder);
+                    console.log(`Uploading to Supabase: ${file}`);
+                    const cloudUrl = await uploadToSupabase(filePath, subFolder, file);
 
                     if (cloudUrl) {
                         await Resource.updateOne(
@@ -113,13 +76,13 @@ const seedCloudResources = async () => {
                             },
                             { upsert: true }
                         );
-                        console.log(`Repaired in DB: ${file}`);
+                        console.log(`Saved to DB: ${cloudUrl}`);
                     }
                 }
             }
         }
 
-        console.log('All resources migrated to Cloud!');
+        console.log('All resources migrated to Supabase!');
         process.exit(0);
 
     } catch (err) {
