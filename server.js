@@ -39,7 +39,11 @@ app.use('/uploads', express.static('uploads'));
 const startServer = async () => {
     try {
         await connectDB();
-        await seedResources();
+
+        // Only run local seeder in development mode to avoid overwriting Cloud data
+        if (process.env.NODE_ENV !== 'production') {
+            await seedResources();
+        }
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
