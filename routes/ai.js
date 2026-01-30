@@ -13,7 +13,7 @@ const Resource = require('../models/Resource');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY");
 
 // Helper to get model
-const getModel = () => genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const getModel = () => genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
 
 // Chat Endpoint
 router.post('/chat', async (req, res) => {
