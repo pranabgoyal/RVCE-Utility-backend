@@ -9,6 +9,11 @@ router.post('/signup', async (req, res) => {
     try {
         const { fullName, email, password, year, department } = req.body;
 
+        // Validation: Restrict to RVCE emails
+        if (!email.endsWith('@rvce.edu.in')) {
+            return res.status(400).json({ msg: 'Registration restricted to @rvce.edu.in emails only.' });
+        }
+
         // Check if user exists
         let user = await User.findOne({ email });
         if (user) {
