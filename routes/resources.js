@@ -3,16 +3,22 @@ const router = express.Router();
 const Resource = require('../models/Resource');
 
 // get resources (with filters)
+// get resources (with filters)
 router.get('/', async (req, res) => {
     try {
         const { branch, year, category } = req.query;
         let query = {};
 
-        if (branch) query.branch = branch;
+        // Fix: If branch is 'All', do not apply filter
+        if (branch && branch !== 'All') query.branch = branch;
         if (year) query.year = year;
         if (category) query.category = category;
 
+        console.log('GET /resources Query:', query);
+
         const resources = await Resource.find(query).sort({ createdAt: -1 });
+
+        console.log(`Found ${resources.length} resources`);
         res.json(resources);
     } catch (err) {
         console.error(err.message);
