@@ -1,7 +1,7 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load env vars BEFORE requiring other modules that use them
+// Load env vars BEFORE requiring other modules
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const mongoose = require('mongoose');
@@ -21,18 +21,37 @@ const getCategory = (filename) => {
     return 'Notes';
 };
 
+// Recursive function to get all files in a directory
+const getFilesRecursively = (dir) => {
+    let results = [];
+    const list = fs.readdirSync(dir);
+    list.forEach(file => {
+        const filePath = path.join(dir, file);
+        const stat = fs.statSync(filePath);
+        if (stat && stat.isDirectory()) {
+            results = results.concat(getFilesRecursively(filePath));
+        } else {
+            // Skip hidden files or READMEs
+            if (!file.startsWith('.') && file.toLowerCase() !== 'readme.md') {
+                results.push(filePath);
+            }
+        }
+    });
+    return results;
+};
+
 const seedCloudResources = async () => {
     try {
         console.log('Connecting to MongoDB Atlas...');
         await mongoose.connect(process.env.MONGODB_URI);
         console.log('Connected.');
 
-        console.log('Scanning local files...');
         if (!fs.existsSync(UPLOADS_DIR)) {
             console.error(`Source directory not found: ${UPLOADS_DIR}`);
             process.exit(1);
         }
 
+        // We assume 1st level is "Semester" or "Category"
         const semesterFolders = fs.readdirSync(UPLOADS_DIR).filter(f => fs.statSync(path.join(UPLOADS_DIR, f)).isDirectory());
 
         for (const semFolder of semesterFolders) {
@@ -41,22 +60,29 @@ const seedCloudResources = async () => {
             if (semFolder === '1st_sem') semesterName = 'Semester 1';
             if (semFolder === '2nd sem') semesterName = 'Semester 2';
 
+            // Treat top-level folders like "Programming Language Course" as 'Semester 1' or generic if unclear
+            // For simplicity, we just keep the folder name if it's not 1st/2nd sem
+
             const subjectFolders = fs.readdirSync(semPath).filter(f => fs.statSync(path.join(semPath, f)).isDirectory());
 
             for (const subFolder of subjectFolders) {
                 const subPath = path.join(semPath, subFolder);
-                const files = fs.readdirSync(subPath).filter(f => !fs.statSync(path.join(subPath, f)).isDirectory());
 
-                console.log(`Processing ${files.length} files in ${semesterName} > ${subFolder}...`);
+                // RECURSIVE SCAN: Find all files inside this subject, even in subfolders
+                const allFiles = getFilesRecursively(subPath);
 
-                for (const file of files) {
-                    if (file.startsWith('.') || file.toLowerCase() === 'readme.md') continue;
+                console.log(`Processing ${allFiles.length} files in ${semesterName} > ${subFolder}...`);
 
-                    const filePath = path.join(subPath, file);
+                for (const filePath of allFiles) {
+                    const file = path.basename(filePath);
                     const title = path.basename(file, path.extname(file)).replace(/_/g, ' ');
 
                     console.log(`Uploading to Supabase: ${file}`);
-                    const cloudUrl = await uploadToSupabase(filePath, subFolder, file);
+
+                    // We need to pass the "subject" (subFolder) as the Cloud folder
+                    const folderForCloud = subFolder;
+
+                    const cloudUrl = await uploadToSupabase(filePath, folderForCloud, file);
 
                     if (cloudUrl) {
                         await Resource.updateOne(
