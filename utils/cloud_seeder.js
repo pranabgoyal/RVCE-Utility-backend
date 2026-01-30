@@ -31,10 +31,10 @@ const uploadToCloudinary = async (filePath, folderName) => {
     try {
         const result = await cloudinary.uploader.upload(filePath, {
             folder: `engineering-resources/${folderName}`,
-            resource_type: 'auto',
+            resource_type: 'raw', // CHANGED: 'raw' is safer for PDFs/Docs (avoids explicit image conversion)
             use_filename: true,
             unique_filename: false,
-            overwrite: false
+            overwrite: true // CHANGED: Force overwrite of bad files on Cloud
         });
         return result.secure_url;
     } catch (error) {
@@ -77,19 +77,22 @@ const seedCloudResources = async () => {
                     const filePath = path.join(subPath, file);
                     const title = path.basename(file, path.extname(file)).replace(/_/g, ' ');
 
-                    // Check if already exists in DB to skip upload
+                    // RE-SEEDING LOGIC:
+                    // We REMOVED the "skip if existing" check to force repair of broken links.
+                    /*
                     const existing = await Resource.findOne({
                         title: title,
                         subject: subFolder,
-                        fileUrl: { $regex: 'cloudinary' } // Only skip if already on cloud
+                        fileUrl: { $regex: 'cloudinary' }
                     });
 
                     if (existing) {
                         console.log(`Skipping (Already in DB): ${file}`);
                         continue;
                     }
+                    */
 
-                    console.log(`Uploading: ${file}`);
+                    console.log(`Uploading (Raw Mode): ${file}`);
                     const cloudUrl = await uploadToCloudinary(filePath, subFolder);
 
                     if (cloudUrl) {
@@ -110,7 +113,7 @@ const seedCloudResources = async () => {
                             },
                             { upsert: true }
                         );
-                        console.log(`Saved to DB: ${file}`);
+                        console.log(`Repaired in DB: ${file}`);
                     }
                 }
             }

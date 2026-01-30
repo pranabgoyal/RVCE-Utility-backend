@@ -33,8 +33,12 @@ app.use('/api/resources', require('./routes/resources'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/quiz', require('./routes/quiz'));
 
-// Serve Uploads Static Folder
-app.use('/uploads', express.static('uploads'));
+const path = require('path');
+// Serve Uploads Static Folder (Point to Frontend Public folder for local dev)
+app.use('/uploads', (req, res, next) => {
+    console.log(`📂 Request for static file: ${req.url}`);
+    next();
+}, express.static(path.join(__dirname, '../frontend/public/uploads')));
 
 // Start Server
 const startServer = async () => {
@@ -48,6 +52,7 @@ const startServer = async () => {
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
+            console.log(`GEMINI_API_KEY Status: ${process.env.GEMINI_API_KEY ? '✅ Loaded' : '❌ Missing'}`);
         });
     } catch (err) {
         console.error('Failed to start server:', err);
