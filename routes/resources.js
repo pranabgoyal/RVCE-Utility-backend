@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
         if (year) query.year = year;
         if (category) query.category = category;
 
-        const resources = await Resource.find(query).sort({ createdAt: -1 });
+        const resources = await Resource.find(query).sort({ createdAt: -1 }).lean();
         res.json(resources);
     } catch (err) {
         console.error(err.message);
