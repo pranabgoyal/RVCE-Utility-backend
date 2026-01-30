@@ -14,11 +14,7 @@ router.get('/', async (req, res) => {
         if (year) query.year = year;
         if (category) query.category = category;
 
-        console.log('GET /resources Query:', query);
-
         const resources = await Resource.find(query).sort({ createdAt: -1 });
-
-        console.log(`Found ${resources.length} resources`);
         res.json(resources);
     } catch (err) {
         console.error(err.message);
