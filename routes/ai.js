@@ -1,5 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const dotenv = require('dotenv');
+const path = require('path');
+
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Resource = require('../models/Resource');
