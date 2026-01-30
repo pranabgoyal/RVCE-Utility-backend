@@ -21,38 +21,18 @@ router.get('/', async (req, res) => {
 });
 
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-// Configure Multer Storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = 'uploads/';
-        // Ensure directory exists
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir);
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        // Unique filename: fieldname-timestamp.extension
-        cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-    }
-});
-
-// File Filter (Optional: specific types)
-const fileFilter = (req, file, cb) => {
-    // Accept images and pdfs
-    if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) {
-        cb(null, true);
-    } else {
-        cb(new Error('Only PDF and Image files are allowed!'), false);
-    }
-};
+const { storage } = require('../config/cloudinary');
 
 const upload = multer({
     storage: storage,
-    fileFilter: fileFilter,
+    fileFilter: (req, file, cb) => {
+        // Accept images and pdfs
+        if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF and Image files are allowed!'), false);
+        }
+    },
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
@@ -63,10 +43,8 @@ router.post('/', upload.single('file'), async (req, res) => {
 
         let fileUrl = '';
         if (req.file) {
-            // Construct accessible URL
-            // Assuming server runs on same host/port. client needs to prepend base URL.
-            // Or store full URL if preferred. Storing relative path is safer.
-            fileUrl = `/uploads/${req.file.filename}`;
+            // Cloudinary returns the URL in `path` or `secure_url`
+            fileUrl = req.file.path || req.file.secure_url;
         }
 
         const newResource = new Resource({
