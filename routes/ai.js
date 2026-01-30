@@ -44,7 +44,8 @@ router.post('/chat', async (req, res) => {
 
     } catch (err) {
         console.error("AI Chat Error:", err.message);
-        res.status(500).json({ reply: "Sorry, I'm having trouble thinking right now. Please try again later." });
+        // Temporary Debug: Send actual error to client
+        res.status(500).json({ reply: `Error: ${err.message}` });
     }
 });
 
@@ -87,7 +88,7 @@ router.post('/quiz', async (req, res) => {
 
     } catch (err) {
         console.error("AI Quiz Error:", err.message);
-        res.status(500).send('Server Error');
+        res.status(500).json({ error: `Debug Error: ${err.message}` });
     }
 });
 
