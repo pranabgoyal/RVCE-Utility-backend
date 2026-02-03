@@ -29,7 +29,8 @@ app.get('/', (req, res) => {
 
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/resources', require('./routes/resources'));
+app.use('/api/resources', require('./routes/resources')); // Keeping for backward compat if needed, or remove
+app.use('/api/github', require('./routes/github')); // NEW GitHub route
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/quiz', require('./routes/quiz'));
 
