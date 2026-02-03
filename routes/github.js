@@ -7,7 +7,8 @@ const REPOS = {
     '1': { owner: 'pranabgoyal', repo: '1st-year-resources-2022-scheme-rvce' },
     '2': { owner: 'pranabgoyal', repo: '2nd-year-resources-2022-scheme-rvce' },
     '3': { owner: 'pranabgoyal', repo: '3rd-year-resources-2022-scheme-rvce' },
-    '4': { owner: 'pranabgoyal', repo: '4th_year_resources_2022_scheme_RVCE' }
+    '4': { owner: 'pranabgoyal', repo: '4th_year_resources_2022_scheme_RVCE' },
+    'mock-papers': { owner: 'pranabgoyal', repo: 'RVCE-Utility-Mock-Papers' }
 };
 
 // Simple In-Memory Cache (Duration: 5 minutes)
