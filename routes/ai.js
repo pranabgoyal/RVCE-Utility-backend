@@ -13,12 +13,36 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY
 // Helper to get model
 const getModel = () => genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Upgraded to newer model if available or stick to stable
 
+const axios = require('axios');
+const pdf = require('pdf-parse');
+
+// Helper to fetch and parse file content
+async function getFileContent(url) {
+    try {
+        if (!url) return null;
+        console.log("Fetching content from:", url);
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+
+        // Check file type based on extension or headers (simplified here)
+        if (url.toLowerCase().endsWith('.pdf')) {
+            const data = await pdf(buffer);
+            return data.text.substring(0, 20000); // Limit context to ~20k chars to stay within limits
+        } else {
+            // Assume text/code
+            return buffer.toString('utf-8').substring(0, 20000);
+        }
+    } catch (error) {
+        console.error("Error fetching file content:", error.message);
+        return null;
+    }
+}
+
 // Chat Endpoint
 router.post('/chat', async (req, res) => {
     try {
-        // Now accepting direct context params instead of resourceId
         const { message, context } = req.body;
-        // context object: { title, subject, branch, textContent (if available) }
+        // context: { title, subject, branch, fileUrl }
 
         if (!process.env.GEMINI_API_KEY) {
             return res.json({ reply: "⚠️ System Error: AI Service is missing API Key." });
@@ -26,12 +50,19 @@ router.post('/chat', async (req, res) => {
 
         const model = getModel();
 
-        let promptContext = "";
-        if (context) {
-            promptContext = `Context: The student is studying a resource titled "${context.title}"`;
-            if (context.subject) promptContext += ` for the subject "${context.subject}"`;
-            if (context.branch) promptContext += ` (${context.branch} Branch)`;
-            promptContext += ".";
+        // 1. Build Context
+        let promptContext = `Context: The student is studying a resource titled "${context?.title || 'Unknown'}"`;
+        if (context?.subject) promptContext += ` for the subject "${context.subject}"`;
+        if (context?.branch) promptContext += ` (${context.branch} Branch).`;
+
+        // 2. Fetch Content if available
+        if (context?.fileUrl) {
+            const fileContent = await getFileContent(context.fileUrl);
+            if (fileContent) {
+                promptContext += `\n\n--- DOCUMENT CONTENT START ---\n${fileContent}\n--- DOCUMENT CONTENT END ---\n`;
+            } else {
+                promptContext += `\n(Note: Could not retrieve document content from ${context.fileUrl})`;
+            }
         }
 
         const prompt = `You are a helpful engineering tutor.
@@ -39,7 +70,9 @@ router.post('/chat', async (req, res) => {
         
         Student Question: "${message}"
         
-        Answer concisely and helpfully. If the question is unrelated to the context, politely guide them back.`;
+        Answer concisely and helpfully based on the provided document content (if any). 
+        If the answer is in the document, cite it. 
+        If the question is unrelated to the context, politely guide them back.`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -57,7 +90,7 @@ router.post('/chat', async (req, res) => {
 router.post('/quiz', async (req, res) => {
     try {
         const { context } = req.body;
-        // context object: { title, subject, branch }
+        // context: { title, subject, branch, fileUrl }
 
         if (!process.env.GEMINI_API_KEY) {
             return res.status(503).json({ error: "AI Service Unavailable" });
@@ -65,15 +98,25 @@ router.post('/quiz', async (req, res) => {
 
         const model = getModel();
 
-        // Fallback defaults if context is missing (e.g. random quiz)
         const subject = context?.subject || "General Engineering";
         const topic = context?.title || "Engineering Concepts";
         const branch = context?.branch || "Common";
 
-        const prompt = `Generate a short multiple-choice quiz (5 questions) based on:
+        let contentContext = "";
+        if (context?.fileUrl) {
+            const fileContent = await getFileContent(context.fileUrl);
+            if (fileContent) {
+                contentContext = `\nBased strictly on the following content:\n${fileContent.substring(0, 15000)}\n`;
+            }
+        }
+
+        const prompt = `Generate a short multiple-choice quiz (5 questions).
         Subject: "${subject}"
         Topic: "${topic}"
         Target Audience: ${branch} Engineering Students.
+        ${contentContext}
+        
+        Return ONLY valid JSON in this exact format, with no extra text or markdown:
         
         Return ONLY valid JSON in this exact format, with no extra text or markdown:
         [
