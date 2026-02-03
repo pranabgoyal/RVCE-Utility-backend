@@ -18,26 +18,17 @@ app.use(express.json());
 
 // Database Connection
 const connectDB = require('./config/db');
-const seedResources = require('./utils/seeder');
-
-// ...
-
-// Routes
-app.get('/', (req, res) => {
-    res.send('API is running...');
-});
 
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/resources', require('./routes/resources')); // Keeping for backward compat if needed, or remove
-app.use('/api/github', require('./routes/github')); // NEW GitHub route
+app.use('/api/github', require('./routes/github'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/quiz', require('./routes/quiz'));
 
 const path = require('path');
 // Serve Uploads Static Folder (Point to Frontend Public folder for local dev)
 app.use('/uploads', (req, res, next) => {
-    console.log(`📂 Request for static file: ${req.url}`);
+    // console.log(`📂 Request for static file: ${req.url}`);
     next();
 }, express.static(path.join(__dirname, '../frontend/public/uploads')));
 
@@ -45,11 +36,6 @@ app.use('/uploads', (req, res, next) => {
 const startServer = async () => {
     try {
         await connectDB();
-
-        // Only run local seeder in development mode to avoid overwriting Cloud data
-        if (process.env.NODE_ENV !== 'production') {
-            await seedResources();
-        }
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

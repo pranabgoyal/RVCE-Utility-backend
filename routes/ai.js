@@ -6,31 +6,36 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const Resource = require('../models/Resource');
 
 // Initialize Gemini
-// Note: This requires GEMINI_API_KEY in .env
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY");
 
 // Helper to get model
-const getModel = () => genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
+const getModel = () => genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Upgraded to newer model if available or stick to stable
 
 // Chat Endpoint
 router.post('/chat', async (req, res) => {
     try {
-        const { resourceId, message } = req.body;
+        // Now accepting direct context params instead of resourceId
+        const { message, context } = req.body;
+        // context object: { title, subject, branch, textContent (if available) }
 
         if (!process.env.GEMINI_API_KEY) {
-            return res.json({ reply: "⚠️ System Error: AI Service is missing API Key. Please notify the administrator." });
+            return res.json({ reply: "⚠️ System Error: AI Service is missing API Key." });
         }
 
-        // Fetch resource context
-        const resource = await Resource.findById(resourceId);
-        if (!resource) return res.status(404).json({ reply: "Error: Resource not found." });
-
         const model = getModel();
+
+        let promptContext = "";
+        if (context) {
+            promptContext = `Context: The student is studying a resource titled "${context.title}"`;
+            if (context.subject) promptContext += ` for the subject "${context.subject}"`;
+            if (context.branch) promptContext += ` (${context.branch} Branch)`;
+            promptContext += ".";
+        }
+
         const prompt = `You are a helpful engineering tutor.
-        Context: The student is studying a resource titled "${resource.title}" for the subject "${resource.subject}" (${resource.branch} Branch).
+        ${promptContext}
         
         Student Question: "${message}"
         
@@ -44,7 +49,6 @@ router.post('/chat', async (req, res) => {
 
     } catch (err) {
         console.error("AI Chat Error:", err.message);
-        // Temporary Debug: Send actual error to client
         res.status(500).json({ reply: `Error: ${err.message}` });
     }
 });
@@ -52,18 +56,24 @@ router.post('/chat', async (req, res) => {
 // Quiz Endpoint
 router.post('/quiz', async (req, res) => {
     try {
-        const { resourceId } = req.body;
+        const { context } = req.body;
+        // context object: { title, subject, branch }
 
         if (!process.env.GEMINI_API_KEY) {
             return res.status(503).json({ error: "AI Service Unavailable" });
         }
 
-        const resource = await Resource.findById(resourceId);
-        if (!resource) return res.status(404).json({ error: "Resource not found" });
-
         const model = getModel();
-        const prompt = `Generate a short multiple-choice quiz (5 questions) based on the engineering subject: "${resource.subject}" and topic "${resource.title}".
-        Target Audience: ${resource.branch} Engineering Students.
+
+        // Fallback defaults if context is missing (e.g. random quiz)
+        const subject = context?.subject || "General Engineering";
+        const topic = context?.title || "Engineering Concepts";
+        const branch = context?.branch || "Common";
+
+        const prompt = `Generate a short multiple-choice quiz (5 questions) based on:
+        Subject: "${subject}"
+        Topic: "${topic}"
+        Target Audience: ${branch} Engineering Students.
         
         Return ONLY valid JSON in this exact format, with no extra text or markdown:
         [
