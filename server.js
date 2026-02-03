@@ -24,6 +24,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/github', require('./routes/github'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/quiz', require('./routes/quiz'));
+app.use('/api/upload', require('./routes/upload')); // New Upload Route
 
 const path = require('path');
 // Serve Uploads Static Folder (Point to Frontend Public folder for local dev)
