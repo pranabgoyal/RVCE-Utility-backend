@@ -11,7 +11,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY");
 
 // Helper to get model
-const getModel = () => genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Upgraded to newer model if available or stick to stable
+const getModel = () => genAI.getGenerativeModel({ model: "gemini-flash-latest" }); // Using confirmed working model alias
 
 const axios = require('axios');
 const pdf = require('pdf-parse');
