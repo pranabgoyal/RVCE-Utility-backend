@@ -88,4 +88,56 @@ router.get('/', async (req, res) => {
     }
 });
 
+// @route   DELETE api/upload/:id
+// @desc    Delete a resource
+// @access  Private
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const resource = await Resource.findById(req.params.id);
+
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+
+        // Check user
+        if (resource.uploadedBy.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        // Delete from Supabase
+        // Extract path from publicUrl
+        // URL format: .../resources/public/branch/year/subject/filename
+        // Storage path: branch/year/subject/filename
+
+        try {
+            const urlParts = resource.fileUrl.split('/resources/public/'); // Adjust based on your actual URL structure if needed
+            if (urlParts.length > 1) {
+                const storagePath = urlParts[1];
+                const { error } = await supabase
+                    .storage
+                    .from('resources')
+                    .remove([storagePath]);
+
+                if (error) {
+                    console.error('Supabase Delete Error:', error);
+                    // Continue to delete from DB even if remote file fails? 
+                    // Usually yes, or user can't remove broken links.
+                }
+            }
+        } catch (err) {
+            console.error('Error parsing URL for deletion:', err);
+        }
+
+        await resource.deleteOne();
+
+        res.json({ msg: 'Resource removed' });
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+        res.status(500).send('Server Error');
+    }
+});
+
 module.exports = router;
