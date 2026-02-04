@@ -38,6 +38,16 @@ const startServer = async () => {
     try {
         await connectDB();
 
+        // Check if DB is empty and seed (Local Development Helper)
+        const Question = require('./models/Question');
+        const count = await Question.countDocuments();
+        if (count === 0) {
+            console.log('🌱 Database empty. Seeding AI & ML questions...');
+            const { seedQuestions } = require('./utils/seed_data');
+            await Question.insertMany(seedQuestions);
+            console.log('✅ Seeding complete!');
+        }
+
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
             console.log(`GEMINI_API_KEY Status: ${process.env.GEMINI_API_KEY ? '✅ Loaded' : '❌ Missing'}`);
