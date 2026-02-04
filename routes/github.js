@@ -14,6 +14,67 @@ const REPOS = {
 // Simple In-Memory Cache (Duration: 5 minutes)
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
+const TREE_CACHE = new Map(); // Separate cache for full repo trees
+
+// Search Endpoint (Must be before /:year* wildcard)
+router.get('/search', async (req, res) => {
+    const { q } = req.query;
+    if (!q || q.length < 2) return res.json([]);
+
+    const query = q.toLowerCase();
+    const allResults = [];
+
+    try {
+        // Iterate over all configured repos
+        for (const [yearId, config] of Object.entries(REPOS)) {
+            // Skip if it's the mock-papers repo for now (or include it if desired)
+            // Including everything:
+
+            const cacheKey = `tree:${yearId}`;
+            let tree = [];
+
+            // Check Cache
+            if (TREE_CACHE.has(cacheKey) && (Date.now() - TREE_CACHE.get(cacheKey).timestamp < 3600000)) { // 1 hour cache
+                tree = TREE_CACHE.get(cacheKey).data;
+            } else {
+                // Fetch Recursive Tree
+                // Defaulting to 'main' branch. If fails, could try 'master'.
+                try {
+                    const treeUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/git/trees/main?recursive=1`;
+                    const treeRes = await axios.get(treeUrl, {
+                        headers: { 'Accept': 'application/vnd.github.v3+json' }
+                    });
+                    tree = treeRes.data.tree;
+                    TREE_CACHE.set(cacheKey, { data: tree, timestamp: Date.now() });
+                } catch (err) {
+                    console.error(`Failed to fetch tree for ${yearId}:`, err.message);
+                    continue; // Skip this repo if failed
+                }
+            }
+
+            // Filter Tree
+            const matches = tree.filter(item =>
+                item.type === 'blob' && // only files
+                item.path.toLowerCase().includes(query)
+            ).map(item => ({
+                name: item.path.split('/').pop(), // filename
+                path: item.path,
+                type: 'file',
+                download_url: `https://raw.githubusercontent.com/${config.owner}/${config.repo}/main/${item.path}`,
+                yearId: yearId,
+                repoName: config.repo
+            }));
+
+            allResults.push(...matches);
+        }
+
+        res.json(allResults);
+
+    } catch (err) {
+        console.error('Search Error:', err);
+        res.status(500).send('Search failed');
+    }
+});
 
 router.get('/:year*', async (req, res) => {
     try {
