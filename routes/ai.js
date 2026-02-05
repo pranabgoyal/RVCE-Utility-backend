@@ -14,24 +14,23 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY
 const getModel = () => genAI.getGenerativeModel({ model: "gemini-flash-latest" }); // Using confirmed working model alias
 
 const axios = require('axios');
-const pdf = require('pdf-parse');
+// const pdf = require('pdf-parse'); // No longer needed for multimodal
 
-// Helper to fetch and parse file content
-async function getFileContent(url) {
+// Helper to fetch file and return base64
+async function getFilePart(url) {
     try {
         if (!url) return null;
         console.log("Fetching content from:", url);
         const response = await axios.get(url, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data);
+        const mimeType = response.headers['content-type'] || 'application/pdf'; // Default to PDF if unknown
 
-        // Check file type based on extension or headers (simplified here)
-        if (url.toLowerCase().endsWith('.pdf')) {
-            const data = await pdf(buffer);
-            return data.text.substring(0, 20000); // Limit context to ~20k chars to stay within limits
-        } else {
-            // Assume text/code
-            return buffer.toString('utf-8').substring(0, 20000);
-        }
+        return {
+            inlineData: {
+                data: buffer.toString("base64"),
+                mimeType: mimeType
+            }
+        };
     } catch (error) {
         console.error("Error fetching file content:", error.message);
         return null;
@@ -50,31 +49,31 @@ router.post('/chat', async (req, res) => {
 
         const model = getModel();
 
-        // 1. Build Context
-        let promptContext = `Context: The student is studying a resource titled "${context?.title || 'Unknown'}"`;
-        if (context?.subject) promptContext += ` for the subject "${context.subject}"`;
-        if (context?.branch) promptContext += ` (${context.branch} Branch).`;
+        // 1. Build Text Context
+        let textPrompt = `You are a helpful engineering tutor.
+        Context: The student is studying a resource titled "${context?.title || 'Unknown'}"`;
+        if (context?.subject) textPrompt += ` for the subject "${context.subject}"`;
+        if (context?.branch) textPrompt += ` (${context.branch} Branch).`;
 
-        // 2. Fetch Content if available
+        textPrompt += `\n\nStudent Question: "${message}"\n\nAnswer concisely and helpfully based on the provided document. If the document is irrelevant to the question, politely guide them back.`;
+
+        // 2. Prepare Parts
+        const parts = [
+            { text: textPrompt }
+        ];
+
+        // 3. Fetch File if available
         if (context?.fileUrl) {
-            const fileContent = await getFileContent(context.fileUrl);
-            if (fileContent) {
-                promptContext += `\n\n--- DOCUMENT CONTENT START ---\n${fileContent}\n--- DOCUMENT CONTENT END ---\n`;
-            } else {
-                promptContext += `\n(Note: Could not retrieve document content from ${context.fileUrl})`;
+            const filePart = await getFilePart(context.fileUrl);
+            if (filePart) {
+                parts.unshift(filePart); // Add file as the first part
             }
         }
 
-        const prompt = `You are a helpful engineering tutor.
-        ${promptContext}
-        
-        Student Question: "${message}"
-        
-        Answer concisely and helpfully based on the provided document content (if any). 
-        If the answer is in the document, cite it. 
-        If the question is unrelated to the context, politely guide them back.`;
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: parts }]
+        });
 
-        const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
 
@@ -105,22 +104,12 @@ router.post('/quiz', async (req, res) => {
         const topic = context?.title || "Engineering Concepts";
         const branch = context?.branch || "Common";
 
-        let contentContext = "";
-        if (context?.fileUrl) {
-            const fileContent = await getFileContent(context.fileUrl);
-            if (fileContent) {
-                contentContext = `\nBased strictly on the following content:\n${fileContent.substring(0, 15000)}\n`;
-            }
-        }
-
-        const prompt = `Generate a short multiple-choice quiz (5 questions).
+        let textPrompt = `Generate a short multiple-choice quiz (5 questions).
         Subject: "${subject}"
         Topic: "${topic}"
         Target Audience: ${branch} Engineering Students.
-        ${contentContext}
         
-        Return ONLY valid JSON in this exact format, with no extra text or markdown:
-        
+        Using the provided document (if any), create relevant questions.
         Return ONLY valid JSON in this exact format, with no extra text or markdown:
         [
             {
@@ -132,7 +121,23 @@ router.post('/quiz', async (req, res) => {
         ]
         (correctAnswer should be the index 0-3 of the correct option)`;
 
-        const result = await model.generateContent(prompt);
+        // Prepare Parts
+        const parts = [
+            { text: textPrompt }
+        ];
+
+        // Fetch File if available
+        if (context?.fileUrl) {
+            const filePart = await getFilePart(context.fileUrl);
+            if (filePart) {
+                parts.unshift(filePart);
+            }
+        }
+
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: parts }]
+        });
+
         const response = await result.response;
         let text = response.text();
 
