@@ -21,7 +21,11 @@ async function getFilePart(url) {
     try {
         if (!url) return null;
         console.log("Fetching content from:", url);
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        // Timeout after 15 seconds to avoid hanging the entire request
+        const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+            timeout: 15000
+        });
         const buffer = Buffer.from(response.data);
         const mimeType = response.headers['content-type'] || 'application/pdf'; // Default to PDF if unknown
 
