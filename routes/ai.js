@@ -40,7 +40,11 @@ async function getFilePart(url) {
 // Chat Endpoint
 router.post('/chat', async (req, res) => {
     try {
+        console.log("--- AI Chat Request Received ---");
         const { message, context } = req.body;
+        console.log("Message:", message);
+        console.log("Context Title:", context?.title);
+        console.log("Context FileURL:", context?.fileUrl);
         // context: { title, subject, branch, fileUrl }
 
         if (!process.env.GEMINI_API_KEY) {
