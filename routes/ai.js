@@ -11,7 +11,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY");
 
 // Helper to get model
-const getModel = () => genAI.getGenerativeModel({ model: "gemini-flash-latest" }); // Using confirmed working model alias
+const getModel = () => genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Explicitly use 1.5 Flash for better limits & multimodal support
 
 const axios = require('axios');
 // const pdf = require('pdf-parse'); // No longer needed for multimodal
@@ -80,10 +80,11 @@ router.post('/chat', async (req, res) => {
         res.json({ reply: text });
 
     } catch (err) {
-        console.error("AI Chat Error:", err.message);
+        console.error("AI Chat Error Details:", err.response ? err.response.data : err.message);
         let errorMsg = "AI Service Error";
         if (err.message.includes("429")) errorMsg = "AI Usage Limit Exceeded (Try again later)";
         if (err.message.includes("403")) errorMsg = "AI Service Access Denied (Check API Key)";
+        if (err.message.includes("500")) errorMsg = "AI Server Error (Try again)";
         res.status(500).json({ reply: `⚠️ ${errorMsg}` });
     }
 });
