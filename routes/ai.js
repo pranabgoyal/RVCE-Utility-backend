@@ -149,9 +149,11 @@ router.post('/quiz', async (req, res) => {
         res.json({ quiz });
 
     } catch (err) {
-        console.error("AI Quiz Error:", err.message);
+        console.error("AI Quiz Error Details:", err.response ? err.response.data : err.message);
         let errorMsg = "AI Service Error";
         if (err.message.includes("429")) errorMsg = "AI Usage Limit Exceeded (Try again later)";
+        if (err.message.includes("403")) errorMsg = "AI Service Access Denied (Check API Key)";
+        if (err.message.includes("500")) errorMsg = "AI Server Error (Try again)";
         res.status(500).json({ error: errorMsg });
     }
 });
