@@ -12,7 +12,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Multer Config (Memory Storage)
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 50 * 1024 * 1024 } // Limit to 50MB
+});
 
 // @route   POST api/upload
 // @desc    Upload a resource

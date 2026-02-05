@@ -82,7 +82,10 @@ router.post('/chat', async (req, res) => {
 
     } catch (err) {
         console.error("AI Chat Error:", err.message);
-        res.status(500).json({ reply: `Error: ${err.message}` });
+        let errorMsg = "AI Service Error";
+        if (err.message.includes("429")) errorMsg = "AI Usage Limit Exceeded (Try again later)";
+        if (err.message.includes("403")) errorMsg = "AI Service Access Denied (Check API Key)";
+        res.status(500).json({ reply: `⚠️ ${errorMsg}` });
     }
 });
 
@@ -141,7 +144,9 @@ router.post('/quiz', async (req, res) => {
 
     } catch (err) {
         console.error("AI Quiz Error:", err.message);
-        res.status(500).json({ error: `Debug Error: ${err.message}` });
+        let errorMsg = "AI Service Error";
+        if (err.message.includes("429")) errorMsg = "AI Usage Limit Exceeded (Try again later)";
+        res.status(500).json({ error: errorMsg });
     }
 });
 

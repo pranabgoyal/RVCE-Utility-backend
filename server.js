@@ -39,7 +39,6 @@ const connectDB = require('./config/db');
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/github', require('./routes/github'));
 app.use('/api/ai', require('./routes/ai'));
-app.use('/api/quiz', require('./routes/quiz'));
 app.use('/api/upload', require('./routes/upload')); // New Upload Route
 
 const path = require('path');
@@ -54,15 +53,7 @@ const startServer = async () => {
     try {
         await connectDB();
 
-        // Check if DB is empty and seed (Local Development Helper)
-        const Question = require('./models/Question');
-        const count = await Question.countDocuments();
-        if (count === 0) {
-            console.log('🌱 Database empty. Seeding AI & ML questions...');
-            const { seedQuestions } = require('./utils/seed_data');
-            await Question.insertMany(seedQuestions);
-            console.log('✅ Seeding complete!');
-        }
+        // Database seeding removed (Legacy Quiz System replaced by AI)
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
