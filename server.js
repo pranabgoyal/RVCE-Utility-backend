@@ -30,7 +30,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
 }));
-app.use(express.json({ limit: '50mb' })); // Limit body size (increased for Base64 multimodal)
+app.use(express.json({ limit: '10kb' })); // Limit body size
 
 // Database Connection
 const connectDB = require('./config/db');
